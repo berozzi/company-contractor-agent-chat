@@ -1,6 +1,6 @@
 import type { ChatResponse } from './types';
 
-const apiBaseUrl = (import.meta.env.VITE_API_URL || '/api').replace(/\/$/, '');
+const apiBaseUrl = (import.meta.env.API_URL || '/api').replace(/\/$/, '');
 const requestTimeoutMs = 90_000;
 
 interface ApiErrorBody {
