@@ -1,6 +1,6 @@
 import { FormEvent, KeyboardEvent, useEffect, useRef, useState } from 'react';
 
-import { ApiError, getHealth, sendChatMessage } from './api';
+import { ApiError, getHealth, isApiConfigured, sendChatMessage } from './api';
 import type { ChatMessage } from './types';
 
 const MAX_INPUT_LENGTH = 10_000;
@@ -13,7 +13,11 @@ const welcomeMessage: ChatMessage = {
   createdAt: new Date().toISOString(),
 };
 
-type ConnectionState = 'checking' | 'ready' | 'unavailable';
+type ConnectionState = 'checking' | 'ready' | 'unavailable' | 'misconfigured';
+
+const misconfiguredMessage =
+  'Frontend nie zna adresu backendu. Ustaw zmienną API_URL w projekcie Vercel z rootem client, ' +
+  'np. https://<projekt-backend>.vercel.app/api, i zrób redeploy.';
 
 function createMessageId(): string {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
@@ -123,10 +127,23 @@ function App() {
           setConnectionState(data.webhookConfigured ? 'ready' : 'unavailable');
         }
       })
-      .catch(() => {
-        if (active) {
-          setConnectionState('unavailable');
+      .catch((healthError: unknown) => {
+        if (!active) {
+          return;
         }
+
+        if (import.meta.env.PROD && !isApiConfigured) {
+          setConnectionState('misconfigured');
+          setError(misconfiguredMessage);
+          return;
+        }
+
+        setConnectionState('unavailable');
+        setError(
+          healthError instanceof Error
+            ? `Nie udało się połączyć z backendem: ${healthError.message}`
+            : 'Nie udało się połączyć z backendem.',
+        );
       });
 
     return () => {
@@ -235,7 +252,9 @@ function App() {
       ? 'Sprawdzanie połączenia'
       : connectionState === 'ready'
         ? 'Agent online'
-        : 'Webhook do konfiguracji';
+        : connectionState === 'misconfigured'
+          ? 'Brak adresu backendu'
+          : 'Backend niedostępny';
 
   return (
     <div className="app-shell">

@@ -1,6 +1,19 @@
 import type { ChatResponse } from './types';
 
-const apiBaseUrl = (import.meta.env.API_URL || '/api').replace(/\/$/, '');
+// Adres backendu. Na Vercelu ustawiamy API_URL (prefiks dopisany w vite.config.ts),
+// lokalnie zmienna jest pusta i działa proxy z vite.config.ts.
+const configuredApiUrl = (import.meta.env.API_URL || '').trim();
+export const apiBaseUrl = (configuredApiUrl || '/api').replace(/\/$/, '');
+export const isApiConfigured = configuredApiUrl.length > 0;
+
+if (import.meta.env.PROD && !isApiConfigured) {
+  console.warn(
+    '[XYZ] Nie ustawiono API_URL - frontend użyje adresu /api, ' +
+      'czyli własnej domeny. Na Vercel ustaw API_URL=' +
+      'https://<projekt-backend>.vercel.app/api i zrób redeploy.',
+  );
+}
+
 const requestTimeoutMs = 90_000;
 
 interface ApiErrorBody {
@@ -48,7 +61,7 @@ export async function getHealth(): Promise<HealthResponse> {
   });
 
   if (!response.ok) {
-    throw new Error('Health check failed');
+    throw new Error(`Health check failed: GET ${apiBaseUrl}/health -> HTTP ${response.status}`);
   }
 
   return (await response.json()) as HealthResponse;
@@ -115,7 +128,7 @@ export async function sendChatMessage(input: {
     }
 
     throw new ApiError(
-      'Nie udało się połączyć z serwerem. Sprawdź, czy backend jest uruchomiony.',
+      `Nie udało się połączyć z serwerem: GET ${apiBaseUrl}/chat. Sprawdź, czy backend jest uruchomiony.`,
       'NETWORK_ERROR',
     );
   } finally {
