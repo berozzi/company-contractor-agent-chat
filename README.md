@@ -64,8 +64,8 @@ Najprościej wdrożyć to repo jako **dwa projekty Vercel z tego samego GitHuba*
 - **Build Command:** `npm run build`
 - **Output Directory:** `dist`
 - Zmienna środowiskowa:
-  - `VITE_API_URL=https://<nazwa-projektu-backend>.vercel.app/api`
+  - `API_URL=https://<nazwa-projektu-backend>.vercel.app/api`
 
-`VITE_API_URL` jest zmienną publiczną i musi być ustawiona przed buildem. `WEBHOOK_URL` ustawia się wyłącznie w projekcie backendu i nigdy nie należy dodawać go do frontendu.
+`API_URL` jest zmienną publiczną i musi być ustawiona przed buildem. Prefiks `API_URL` jest dopisany do `envPrefix` w `client/vite.config.ts`, bo domyślnie Vite wstrzykuje wyłącznie zmienne z prefiksem `VITE_`. `WEBHOOK_URL` ustawia się wyłącznie w projekcie backendu i nigdy nie należy dodawać go do frontendu.
 
 Nie trzeba ustawiać `PORT` na Vercelu — platforma dostarcza go automatycznie.

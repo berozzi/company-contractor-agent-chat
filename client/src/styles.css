@@ -152,6 +152,10 @@ textarea:disabled {
   background: #e0a34b;
 }
 
+.connection-misconfigured .connection-dot {
+  background: #d9534f;
+}
+
 .connection-checking .connection-dot {
   animation: pulse 1.5s ease-in-out infinite;
   background: #9aa9a1;
