@@ -1,15 +1,192 @@
-import { app } from './app.js';
-import { config } from './config.js';
+import { config as loadEnv } from 'dotenv';
+import express from 'express';
+import { randomUUID } from 'node:crypto';
+import { existsSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const server = app.listen(config.port, () => {
-  console.log(`[XYZ] Backend działa na http://localhost:${config.port}`);
-  console.log(`[XYZ] Webhook n8n: ${config.webhookUrl ? 'skonfigurowany' : 'brak konfiguracji'}`);
+const currentDirectory = dirname(fileURLToPath(import.meta.url));
+loadEnv({ path: resolve(currentDirectory, '../../.env') });
+loadEnv();
+
+const port = Number(process.env.PORT || 3001);
+const webhookUrl =
+  process.env.WEBHOOK_URL ||
+  'https://primary-production-56b7.up.railway.app/webhook/52df2fc4-1a28-447e-9800-297621090ce5/chat';
+
+const app = express();
+const frontendOrigins = (process.env.FRONTEND_URL || '')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+app.use((request, response, next) => {
+  const origin = request.headers.origin;
+  if (origin && (frontendOrigins.length === 0 || frontendOrigins.includes(origin))) {
+    response.setHeader('Access-Control-Allow-Origin', origin);
+  }
+  response.setHeader('Vary', 'Origin');
+  response.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  response.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+
+  if (request.method === 'OPTIONS') {
+    response.sendStatus(204);
+    return;
+  }
+
+  next();
+});
+app.use(express.json());
+
+app.get('/api/health', (_request, response) => {
+  response.json({ status: 'ok', webhookConfigured: true });
 });
 
-const shutdown = (signal: string) => {
-  console.log(`[XYZ] Otrzymano ${signal}, zamykam serwer...`);
-  server.close(() => process.exit(0));
-};
+app.post('/api/chat', async (request, response) => {
+  const body = (request.body ?? {}) as {
+    message?: unknown;
+    sessionID?: unknown;
+    conversationId?: unknown;
+  };
 
-process.once('SIGINT', () => shutdown('SIGINT'));
-process.once('SIGTERM', () => shutdown('SIGTERM'));
+  if (typeof body.message !== 'string' || !body.message.trim()) {
+    response.status(400).json({
+      error: { code: 'INVALID_REQUEST', message: 'Pole message jest wymagane.' },
+    });
+    return;
+  }
+
+  const message = body.message.trim();
+  const sessionID =
+    (typeof body.sessionID === 'string' && body.sessionID.trim()) ||
+    (typeof body.conversationId === 'string' && body.conversationId.trim()) ||
+    randomUUID();
+  try {
+    const webhookResponse = await fetch(webhookUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json, text/plain',
+      },
+      body: JSON.stringify({
+        // Format Chat Triggera n8n.
+        action: 'sendMessage',
+        chatInput: message,
+        sessionId: sessionID,
+        // Alias zgodny z wcześniejszym wymaganiem aplikacji.
+        sessionID,
+      }),
+      signal: AbortSignal.timeout(60_000),
+    });
+
+    const rawResponse = await webhookResponse.text();
+    if (!webhookResponse.ok) {
+      const detail = rawResponse.trim().slice(0, 300);
+      console.error(`[XYZ] Webhook n8n zwrócił HTTP ${webhookResponse.status}: ${detail}`);
+      response.status(502).json({
+        error: {
+          code: 'WEBHOOK_ERROR',
+          message: detail
+            ? `Webhook n8n zwrócił błąd: ${detail}`
+            : `Webhook n8n zwrócił HTTP ${webhookResponse.status}.`,
+        },
+      });
+      return;
+    }
+
+    const reply = extractReply(rawResponse);
+    if (!reply) {
+      response.status(502).json({
+        error: {
+          code: 'EMPTY_WEBHOOK_RESPONSE',
+          message: 'Webhook n8n zwrócił pustą odpowiedź.',
+        },
+      });
+      return;
+    }
+
+    response.json({ reply, sessionID, conversationId: sessionID });
+  } catch (error) {
+    console.error('[XYZ] Błąd połączenia z webhookem n8n:', error);
+    response.status(502).json({
+      error: {
+        code: 'WEBHOOK_UNAVAILABLE',
+        message: 'Nie udało się połączyć z webhookem n8n.',
+      },
+    });
+  }
+});
+
+function extractReply(rawResponse: string): string {
+  if (!rawResponse.trim()) {
+    return '';
+  }
+
+  let payload: unknown = rawResponse;
+  try {
+    payload = JSON.parse(rawResponse) as unknown;
+  } catch {
+    return rawResponse.trim();
+  }
+
+  return findText(payload)?.trim() ?? '';
+}
+
+function findText(value: unknown): string | undefined {
+  if (typeof value === 'string') {
+    return value.trim() ? value : undefined;
+  }
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const text = findText(item);
+      if (text) {
+        return text;
+      }
+    }
+    return undefined;
+  }
+
+  if (typeof value !== 'object' || value === null) {
+    return undefined;
+  }
+
+  const record = value as Record<string, unknown>;
+  for (const key of [
+    'reply',
+    'response',
+    'answer',
+    'text',
+    'content',
+    'output',
+    'data',
+    'message',
+    'json',
+    'result',
+    'body',
+  ]) {
+    const text = findText(record[key]);
+    if (text) {
+      return text;
+    }
+  }
+
+  return undefined;
+}
+
+const clientDist = resolve(currentDirectory, '../../client/dist');
+if (existsSync(join(clientDist, 'index.html'))) {
+  app.use(express.static(clientDist));
+  app.use((request, response, next) => {
+    if (request.method === 'GET' && !request.path.startsWith('/api')) {
+      response.sendFile(join(clientDist, 'index.html'));
+      return;
+    }
+    next();
+  });
+}
+
+app.listen(port, () => {
+  console.log(`[XYZ] Backend: http://localhost:${port}`);
+  console.log(`[XYZ] Webhook: ${webhookUrl}`);
+});

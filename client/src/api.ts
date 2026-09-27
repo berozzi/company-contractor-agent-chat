@@ -1,4 +1,4 @@
-import type { ChatResponse, ConversationMessage } from './types';
+import type { ChatResponse } from './types';
 
 const apiBaseUrl = (import.meta.env.VITE_API_URL || '/api').replace(/\/$/, '');
 const requestTimeoutMs = 90_000;
@@ -56,8 +56,8 @@ export async function getHealth(): Promise<HealthResponse> {
 
 export async function sendChatMessage(input: {
   message: string;
+  sessionID: string;
   conversationId: string;
-  messages: ConversationMessage[];
 }): Promise<ChatResponse> {
   const controller = new AbortController();
   const timeout = window.setTimeout(() => controller.abort(), requestTimeoutMs);
@@ -69,7 +69,11 @@ export async function sendChatMessage(input: {
         'Content-Type': 'application/json',
         Accept: 'application/json',
       },
-      body: JSON.stringify(input),
+      body: JSON.stringify({
+        message: input.message,
+        sessionID: input.sessionID,
+        conversationId: input.conversationId,
+      }),
       signal: controller.signal,
     });
 

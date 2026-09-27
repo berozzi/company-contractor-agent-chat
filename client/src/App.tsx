@@ -1,7 +1,7 @@
 import { FormEvent, KeyboardEvent, useEffect, useRef, useState } from 'react';
 
 import { ApiError, getHealth, sendChatMessage } from './api';
-import type { ChatMessage, ConversationMessage } from './types';
+import type { ChatMessage } from './types';
 
 const MAX_INPUT_LENGTH = 10_000;
 
@@ -179,16 +179,11 @@ function App() {
     setFailedMessageId(null);
     setIsSending(true);
 
-    const conversationMessages: ConversationMessage[] = history.map(({ role, content }) => ({
-      role,
-      content,
-    }));
-
     try {
       const result = await sendChatMessage({
         message: userMessage.content,
+        sessionID: conversationId,
         conversationId,
-        messages: conversationMessages,
       });
 
       setMessages((currentMessages) => [

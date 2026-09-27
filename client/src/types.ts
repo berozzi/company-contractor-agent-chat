@@ -7,12 +7,8 @@ export interface ChatMessage {
   createdAt: string;
 }
 
-export interface ConversationMessage {
-  role: MessageRole;
-  content: string;
-}
-
 export interface ChatResponse {
   reply: string;
-  conversationId: string;
+  sessionID?: string;
+  conversationId?: string;
 }

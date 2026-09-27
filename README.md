@@ -1,82 +1,71 @@
 # Agent kontrahentów XYZ
 
-Prosta aplikacja do rozmowy z agentem AI firmy XYZ. Frontend jest zbudowany w React + Vite + TypeScript, a backend w Node.js + Express. Backend przyjmuje wiadomość, przekazuje ją do webhooka n8n i czeka na odpowiedź, która jest wyświetlana w czacie.
+Prosty czat z agentem AI firmy XYZ. Frontend: React + Vite + TypeScript. Backend: Node.js + Express.
 
-## Uruchomienie lokalne
+## Uruchomienie
 
 Wymagany jest Node.js 20 lub nowszy.
 
-1. Zainstaluj zależności:
+```bash
+npm install
+npm run dev
+```
 
-   ```bash
-   npm install
-   ```
+Adres webhooka jest ustawiony w `.env`:
 
-2. Skopiuj konfigurację:
+```env
+WEBHOOK_URL=https://primary-production-56b7.up.railway.app/webhook/52df2fc4-1a28-447e-9800-297621090ce5/chat
+PORT=3001
+```
 
-   ```bash
-   cp .env.example .env
-   ```
+Frontend działa pod `http://localhost:5173`, a backend pod `http://localhost:3001`.
 
-   Na systemie Windows PowerShell:
+## Webhook n8n
 
-   ```powershell
-   Copy-Item .env.example .env
-   ```
-
-3. Uzupełnij w `.env` adres webhooka n8n:
-
-   ```env
-   WEBHOOK_URL=https://twoja-instancja.n8n.cloud/webhook/xyz-agent
-   ```
-
-   Jeśli workflow jest chroniony sekretem, ustaw też `WEBHOOK_SECRET`. Backend wyśle go w nagłówku `x-webhook-secret`.
-
-4. Uruchom aplikację:
-
-   ```bash
-   npm run dev
-   ```
-
-   Frontend będzie dostępny pod `http://localhost:5173`, a API pod `http://localhost:3001`.
-
-## Workflow n8n
-
-Workflow powinien odbierać wiadomość w polu `message`. Aplikacja wysyła również `conversationId`, pełną historię rozmowy w `messages` oraz `timestamp`, dzięki czemu agent może prowadzić kontekst rozmowy.
-
-Najprostsza odpowiedź webhooka:
+Backend wysyła na webhook JSON w formacie wymaganym przez n8n Chat Trigger:
 
 ```json
 {
-  "reply": "Dziękuję! W czym mogę pomóc?"
+  "action": "sendMessage",
+  "chatInput": "Treść pytania",
+  "sessionId": "identyfikator-sesji",
+  "sessionID": "identyfikator-sesji"
 }
 ```
 
-Aplikacja akceptuje również popularne odpowiedzi n8n, np. `response`, `answer`, `text`, `output`, `data` lub tablicę elementów z odpowiedzią. Najbezpieczniej użyć pola `reply`.
+`sessionId` jest polem wymaganym przez n8n, a `sessionID` jest dodatkowym aliasem. Identyfikator jest zachowywany między kolejnymi pytaniami w tej samej rozmowie. Backend czeka na odpowiedź workflow i zwraca ją do frontendu. Akceptuje odpowiedzi n8n w polach `reply`, `response`, `answer`, `text`, `content`, `output`, `data` lub `message`, a także zwykły tekst.
 
-Przykład payloadu, który otrzymuje n8n:
-
-```json
-{
-  "message": "Czym zajmuje się firma XYZ?",
-  "conversationId": "conversation-abc",
-  "messages": [
-    { "role": "user", "content": "Czym zajmuje się firma XYZ?" }
-  ],
-  "timestamp": "2026-01-01T12:00:00.000Z"
-}
-```
-
-## Build i produkcja
+## Build
 
 ```bash
 npm run build
 npm start
 ```
 
-Po buildzie backend Express serwuje frontend z katalogu `client/dist`. Aplikacja będzie dostępna pod adresem ustawionym przez zmienną `PORT` (domyślnie `http://localhost:3001`).
+Po zbudowaniu backend serwuje frontend z katalogu `client/dist`.
 
-## API
+## Wdrożenie na Vercel
 
-- `GET /api/health` — status usługi i informacja, czy webhook jest skonfigurowany.
-- `POST /api/chat` — przyjmuje `{ message, conversationId?, messages? }` i zwraca `{ reply, conversationId }`.
+Najprościej wdrożyć to repo jako **dwa projekty Vercel z tego samego GitHuba**.
+
+### 1. Backend
+
+- **Root Directory:** `server`
+- **Framework:** Express
+- **Node.js:** 20 lub nowszy
+- Zmienne środowiskowe:
+  - `WEBHOOK_URL` — adres Chat URL n8n
+  - `FRONTEND_URL` — opcjonalnie adres frontendu; przy kilku adresach rozdziel je przecinkami
+
+### 2. Frontend
+
+- **Root Directory:** `client`
+- **Framework:** Vite
+- **Build Command:** `npm run build`
+- **Output Directory:** `dist`
+- Zmienna środowiskowa:
+  - `VITE_API_URL=https://<nazwa-projektu-backend>.vercel.app/api`
+
+`VITE_API_URL` jest zmienną publiczną i musi być ustawiona przed buildem. `WEBHOOK_URL` ustawia się wyłącznie w projekcie backendu i nigdy nie należy dodawać go do frontendu.
+
+Nie trzeba ustawiać `PORT` na Vercelu — platforma dostarcza go automatycznie.
