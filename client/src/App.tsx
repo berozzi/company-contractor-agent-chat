@@ -17,7 +17,7 @@ type ConnectionState = 'checking' | 'ready' | 'unavailable' | 'misconfigured';
 
 const misconfiguredMessage =
   'Frontend nie zna adresu backendu. Ustaw zmienną API_URL w projekcie Vercel z rootem client, ' +
-  'np. https://<projekt-backend>.vercel.app/api, i zrób redeploy.';
+  'np. https://<projekt-backend>.vercel.app, i zrób redeploy.';
 
 function createMessageId(): string {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {

@@ -24,6 +24,11 @@ const configuredOrigins = (process.env.FRONTEND_URL || '')
   .map((origin) => origin.trim().replace(/\/+$/, '').toLowerCase())
   .filter(Boolean);
 
+// Bez FRONTEND_URL (lub z wartoscia "*") backend dopuszcza kazdy origin.
+// Chat jest publiczny i nie uzywa ciasteczek, wiec nie ma powodu go blokowac.
+const allowAllOrigins = configuredOrigins.length === 0 || configuredOrigins.includes('*');
+const restrictedOrigins = allowAllOrigins ? [] : configuredOrigins;
+
 function matchesOrigin(origin: string, pattern: string): boolean {
   if (pattern === '*') {
     return true;
@@ -38,11 +43,11 @@ function matchesOrigin(origin: string, pattern: string): boolean {
 }
 
 function isOriginAllowed(origin: string): boolean {
-  if (configuredOrigins.length === 0) {
+  if (allowAllOrigins) {
     return true;
   }
 
-  return configuredOrigins.some((pattern) => matchesOrigin(origin, pattern));
+  return restrictedOrigins.some((pattern) => matchesOrigin(origin, pattern));
 }
 
 app.use((request, response, next) => {
@@ -56,9 +61,7 @@ app.use((request, response, next) => {
       response.setHeader('Access-Control-Allow-Origin', requestOrigin);
     } else {
       console.warn(
-        `[XYZ] Odrzucony origin CORS: ${requestOrigin} (dozwolone: ${
-          configuredOrigins.join(', ') || 'brak FRONTEND_URL - dowolny origin'
-        })`,
+        `[XYZ] Odrzucony origin CORS: ${requestOrigin} (dozwolone: ${restrictedOrigins.join(', ')})`,
       );
     }
   }
@@ -81,7 +84,12 @@ app.use((request, response, next) => {
 app.use(express.json());
 
 app.get('/api/health', (_request, response) => {
-  response.json({ status: 'ok', webhookConfigured: true });
+  response.json({
+    status: 'ok',
+    webhookConfigured: true,
+    cors: allowAllOrigins ? 'allow-all' : 'restricted',
+    allowedOrigins: allowAllOrigins ? '*' : restrictedOrigins,
+  });
 });
 
 app.post('/api/chat', async (request, response) => {
@@ -231,4 +239,7 @@ if (existsSync(join(clientDist, 'index.html'))) {
 app.listen(port, () => {
   console.log(`[XYZ] Backend: http://localhost:${port}`);
   console.log(`[XYZ] Webhook: ${webhookUrl}`);
+  console.log(
+    `[XYZ] CORS: ${allowAllOrigins ? 'dowolny origin' : restrictedOrigins.join(', ')}`,
+  );
 });

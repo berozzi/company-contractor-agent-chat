@@ -55,7 +55,15 @@ Najprościej wdrożyć to repo jako **dwa projekty Vercel z tego samego GitHuba*
 - **Node.js:** 20 lub nowszy
 - Zmienne środowiskowe:
   - `WEBHOOK_URL` — adres Chat URL n8n
-  - `FRONTEND_URL` — opcjonalnie adres frontendu; przy kilku adresach rozdziel je przecinkami. Obsługiwane są wzorce, np. `https://*.vercel.app` obejmuje wszystkie adresy deploymentów. Pusta wartość dopuszcza każdy origin. Gdy przeglądarka odrzuci origin, backend zapisze w logach `[XYZ] Odrzucony origin CORS: <origin> (dozwolone: ...)`, co pozwala porównać dokładny adres.
+  - `FRONTEND_URL` — opcjonalnie. Pusta wartość lub `*` dopuszcza każdy origin, co jest ustawieniem domyślnym i zwykle najwygodniejszym. Wpisz adresy rozdzielone przecinkami tylko wtedy, gdy chcesz ograniczyć źródła żądań; obsługiwane są wzorce, np. `https://*.vercel.app`.
+
+### Sprawdzenie konfiguracji CORS
+
+Backend zawsze dopuszcza żądania, więc CORS nie powinien blokować czatu. Aby sprawdzić, co faktycznie działa na Vercelu:
+
+- Otwórz `https://<projekt-backendowy>.vercel.app/api/health`. Odpowiedź zawiera `"cors":"allow-all"` albo `"restricted"` wraz z listą dozwolonych originów.
+- Log funkcji przy starcie pokazuje `[XYZ] CORS: dowolny origin` albo listę dozwolonych adresów.
+- Gdy przeglądarka odrzuci origin, w logach pojawi się `[XYZ] Odrzucony origin CORS: <origin> (dozwolone: ...)`.
 
 ### 2. Frontend
 
@@ -64,8 +72,8 @@ Najprościej wdrożyć to repo jako **dwa projekty Vercel z tego samego GitHuba*
 - **Build Command:** `npm run build`
 - **Output Directory:** `dist`
 - Zmienna środowiskowa:
-  - `API_URL=https://<nazwa-projektu-backend>.vercel.app/api`
+  - `API_URL=https://<nazwa-projektu-backend>.vercel.app`
 
-`API_URL` jest zmienną publiczną i musi być ustawiona przed buildem. Prefiks `API_URL` jest dopisany do `envPrefix` w `client/vite.config.ts`, bo domyślnie Vite wstrzykuje wyłącznie zmienne z prefiksem `VITE_`. `WEBHOOK_URL` ustawia się wyłącznie w projekcie backendu i nigdy nie należy dodawać go do frontendu.
+`API_URL` jest zmienną publiczną i musi być ustawiona przed buildem. Prefiks `API_URL` jest dopisany do `envPrefix` w `client/vite.config.ts`, bo domyślnie Vite wstrzykuje wyłącznie zmienne z prefiksem `VITE_`. Ścieżkę `/api` frontend dokleja sam, więc adres można wpisać z nią lub bez niej — oba zapisy działają. `WEBHOOK_URL` ustawia się wyłącznie w projekcie backendu i nigdy nie należy dodawać go do frontendu.
 
 Nie trzeba ustawiać `PORT` na Vercelu — platforma dostarcza go automatycznie.

@@ -1,16 +1,18 @@
+import { resolveApiBaseUrl } from './apiBase';
 import type { ChatResponse } from './types';
 
 // Adres backendu. Na Vercelu ustawiamy API_URL (prefiks dopisany w vite.config.ts),
 // lokalnie zmienna jest pusta i działa proxy z vite.config.ts.
+// "/api" doklejamy automatycznie, wiec API_URL moze byc wpisany z nim lub bez.
 const configuredApiUrl = (import.meta.env.API_URL || '').trim();
-export const apiBaseUrl = (configuredApiUrl || '/api').replace(/\/$/, '');
+export const apiBaseUrl = resolveApiBaseUrl(configuredApiUrl);
 export const isApiConfigured = configuredApiUrl.length > 0;
 
 if (import.meta.env.PROD && !isApiConfigured) {
   console.warn(
     '[XYZ] Nie ustawiono API_URL - frontend użyje adresu /api, ' +
       'czyli własnej domeny. Na Vercel ustaw API_URL=' +
-      'https://<projekt-backend>.vercel.app/api i zrób redeploy.',
+      'https://<projekt-backend>.vercel.app i zrób redeploy.',
   );
 }
 
