@@ -15,19 +15,60 @@ const webhookUrl =
   'https://primary-production-56b7.up.railway.app/webhook/52df2fc4-1a28-447e-9800-297621090ce5/chat';
 
 const app = express();
-const frontendOrigins = (process.env.FRONTEND_URL || '')
+
+const ALLOWED_METHODS = 'GET, POST, OPTIONS';
+const ALLOWED_HEADERS = 'Content-Type';
+
+const configuredOrigins = (process.env.FRONTEND_URL || '')
   .split(',')
-  .map((origin) => origin.trim())
+  .map((origin) => origin.trim().replace(/\/+$/, '').toLowerCase())
   .filter(Boolean);
 
-app.use((request, response, next) => {
-  const origin = request.headers.origin;
-  if (origin && (frontendOrigins.length === 0 || frontendOrigins.includes(origin))) {
-    response.setHeader('Access-Control-Allow-Origin', origin);
+function matchesOrigin(origin: string, pattern: string): boolean {
+  if (pattern === '*') {
+    return true;
   }
+
+  if (!pattern.includes('*')) {
+    return origin === pattern;
+  }
+
+  const escaped = pattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '[^/]*');
+  return new RegExp(`^${escaped}$`).test(origin);
+}
+
+function isOriginAllowed(origin: string): boolean {
+  if (configuredOrigins.length === 0) {
+    return true;
+  }
+
+  return configuredOrigins.some((pattern) => matchesOrigin(origin, pattern));
+}
+
+app.use((request, response, next) => {
+  const requestOrigin = request.headers.origin;
   response.setHeader('Vary', 'Origin');
-  response.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  response.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+
+  if (requestOrigin) {
+    const origin = requestOrigin.trim().replace(/\/+$/, '').toLowerCase();
+
+    if (isOriginAllowed(origin)) {
+      response.setHeader('Access-Control-Allow-Origin', requestOrigin);
+    } else {
+      console.warn(
+        `[XYZ] Odrzucony origin CORS: ${requestOrigin} (dozwolone: ${
+          configuredOrigins.join(', ') || 'brak FRONTEND_URL - dowolny origin'
+        })`,
+      );
+    }
+  }
+
+  response.setHeader('Access-Control-Allow-Methods', ALLOWED_METHODS);
+  response.setHeader(
+    'Access-Control-Allow-Headers',
+    request.headers['access-control-request-headers'] || ALLOWED_HEADERS,
+  );
+  response.setHeader('Access-Control-Max-Age', '86400');
 
   if (request.method === 'OPTIONS') {
     response.sendStatus(204);
@@ -36,6 +77,7 @@ app.use((request, response, next) => {
 
   next();
 });
+
 app.use(express.json());
 
 app.get('/api/health', (_request, response) => {

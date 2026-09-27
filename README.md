@@ -55,7 +55,7 @@ Najprościej wdrożyć to repo jako **dwa projekty Vercel z tego samego GitHuba*
 - **Node.js:** 20 lub nowszy
 - Zmienne środowiskowe:
   - `WEBHOOK_URL` — adres Chat URL n8n
-  - `FRONTEND_URL` — opcjonalnie adres frontendu; przy kilku adresach rozdziel je przecinkami
+  - `FRONTEND_URL` — opcjonalnie adres frontendu; przy kilku adresach rozdziel je przecinkami. Obsługiwane są wzorce, np. `https://*.vercel.app` obejmuje wszystkie adresy deploymentów. Pusta wartość dopuszcza każdy origin. Gdy przeglądarka odrzuci origin, backend zapisze w logach `[XYZ] Odrzucony origin CORS: <origin> (dozwolone: ...)`, co pozwala porównać dokładny adres.
 
 ### 2. Frontend
 
